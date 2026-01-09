@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import Login from "./pages/LoginSection/login";
+import Login from "./pages/LoginSection/Login";
 import Home from "./components/Home";
 import { ToastContainer } from "react-toastify";
 import { ProtectedRoute, PublicRoute } from "./Protectedpublic"; 
@@ -58,9 +58,10 @@ useEffect(()=>{
 
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<Home />} />
-            <Route path="/profile" element={<UserDetails />} />
+            <Route path="/user-profile" element={<UserDetails />} />
             <Route path="/status" element={<Status />} /> 
             <Route path="/setting" element={<Setting />} /> 
+
 
 
 

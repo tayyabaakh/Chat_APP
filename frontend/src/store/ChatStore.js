@@ -221,10 +221,10 @@
 //                 messages:state.messages.map((msg)=>
 //                 msg._id === tempId ? {...msg,messageStatusL:"failed"}:msg),
 //                 error:error?.response?.data?.message || error?.message,
-            
+
 //             }))
 //             throw error;
-            
+
 //         }
 //     },
 
@@ -281,7 +281,7 @@
 //                 messageIds:unreadIds
 //             });
 //             console.log("message mark as read ", data);
-            
+
 //             set((state)=>({
 //                 messages:state.messages.map((msg)=>
 //                 unreadIds.include(msg._id)?{...msg,messageStatus:"read"}:msg)
@@ -295,7 +295,7 @@
 //             }
 //         } catch (error) {
 //             console.error("failed to mark message as read",error);
-            
+
 //         }
 //     },
 //     deleteMessage : async (messageId)=>{
@@ -308,7 +308,7 @@
 //             console.log("error deleting message", error);
 //             set({error:error.response?.data?.message || error.message})
 //             return false;
-            
+
 //         }
 //     },
 //     //  add/change reactions
@@ -411,7 +411,7 @@ export const useChatStore = create((set, get) => ({
         // confirm message delivery 
         socket.on("message_send", (message) => {
             set((state) => ({
-                messages: state.messages.map((msg) => 
+                messages: state.messages.map((msg) =>
                     msg._id === message._id ? { ...msg } : msg
                 )
             }));
@@ -420,17 +420,29 @@ export const useChatStore = create((set, get) => ({
         // update message status
         socket.on("message_status_update", ({ messageId, messageStatus }) => {
             set((state) => ({
-                messages: state.messages.map((msg) => 
+                messages: state.messages.map((msg) =>
                     msg._id === messageId ? { ...msg, messageStatus } : msg
                 )
             }));
         });
 
         // handle reaction on message
+        // socket.on("reaction_update", ({ messageId, reaction }) => {
+        //     set((state) => ({
+        //         messages: state.messages.map((msg) => 
+        //             msg._id === messageId ? { ...msg, reaction } : msg
+        //         )
+        //     }));
+        // });
+
+        // Inside initsocketListners...
         socket.on("reaction_update", ({ messageId, reaction }) => {
             set((state) => ({
-                messages: state.messages.map((msg) => 
-                    msg._id === messageId ? { ...msg, reaction } : msg
+                messages: state.messages.map((msg) =>
+                    // Check if this is the message that was reacted to
+                    msg._id === messageId
+                        ? { ...msg, reactions: reaction } // Ensure your backend returns the updated reaction object/array
+                        : msg
                 )
             }));
         });
@@ -637,13 +649,13 @@ export const useChatStore = create((set, get) => ({
             .filter((msg) => msg.messageStatus !== 'read' && msg.receiver?._id === currentUser?._id)
             .map((msg) => msg._id)
             .filter(Boolean);
-            
+
         if (unreadIds.length === 0) return;
         try {
             const { data } = await axiosInstance.put("/chats/messages/read", {
                 messageIds: unreadIds
             });
-            
+
             set((state) => ({
                 messages: state.messages.map((msg) =>
                     unreadIds.includes(msg._id) ? { ...msg, messageStatus: "read" } : msg)
@@ -673,18 +685,42 @@ export const useChatStore = create((set, get) => ({
         }
     },
 
+    // addReaction: async (messageId, emoji) => {
+    //     const socket = getSocket();
+    //     const { currentUser } = get();
+    //     if (socket && currentUser) {
+    //         socket.emit("add_reaction", {
+    //             messageId,
+    //             emoji,
+    //             userId: currentUser?._id
+    //         });
+    //     }
+    // },
+
     addReaction: async (messageId, emoji) => {
         const socket = getSocket();
-        const { currentUser } = get();
-        if (socket && currentUser) {
-            socket.emit("add_reaction", {
-                messageId,
-                emoji,
-                userId: currentUser?._id
-            });
-        }
-    },
+        const { currentUser, messages } = get();
+        if (!socket || !currentUser) return;
 
+        // 1. Emit to backend
+        socket.emit("add_reaction", {
+            messageId,
+            emoji,
+            userId: currentUser._id
+        });
+
+        // 2. Optimistic Update (Optional but recommended)
+        // This makes the UI feel fast by updating before the server responds
+        set((state) => ({
+            messages: state.messages.map((msg) => {
+                if (msg._id === messageId) {
+                    // Logic depends on if 'reactions' is an array or a single object
+                    return { ...msg, lastReaction: emoji };
+                }
+                return msg;
+            })
+        }));
+    },
     startTyping: (receiverId) => {
         const { currentConversation } = get();
         const socket = getSocket();

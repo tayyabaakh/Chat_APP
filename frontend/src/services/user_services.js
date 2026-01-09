@@ -53,7 +53,7 @@ export const checkUserAuth = async ()=>{
 
 export const logoutUser = async ()=>{
     try {
-        const response =await axiosInstance.put('/auth/logout');
+        const response =await axiosInstance.post('/auth/logout');
         return response.data;
     } catch (error) {
         throw error.response ? error.response.data : error.message

@@ -60,36 +60,49 @@ const Layout = ({ children, isThemeDialogOpen, toggleThemeDialog, isStatusPrevie
       </div>
       {isMobile && <Sidebar />}
 
-      {isThemeDialogOpen && (
-        <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
-          <div className={`${theme === 'dark' ? "bg-[#202c33] text-white" : "bg-white text-black"} p-6 rounded-lg shadow-lg max-w-sm w-full `}>
-            <h2 className='text-2xl font-semibold mb-4'>
-              Choose a theme
-            </h2>
-            <div className=' space-y-4'>
-              <label className='flex items-center space-x-3 cursor-pointer'>
-                <input
-                  type="radio"
-                  value={'light'}
-                  checked={theme === 'dark'}
-                  onChange={() => setTheme("dark")}
-                  className='from-radio text-blue-600'
-                />
-                <span>
-                  Dak
-                </span>
-              </label>
+     {isThemeDialogOpen && (
+  <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50'>
+    {/* Modal Container */}
+    <div className={`${theme === 'dark' ? "bg-[#202c33] text-white" : "bg-white text-black"} p-6 rounded-lg shadow-lg max-w-sm w-full`}>
+      <h2 className='text-2xl font-semibold mb-4'>Choose a theme</h2>
+      
+      <div className='space-y-4'>
+        {/* Dark Option */}
+        <label className='flex items-center space-x-3 cursor-pointer'>
+          <input
+            type="radio"
+            name="theme"
+            value="dark"
+            checked={theme === 'dark'}
+            onChange={() => setTheme("dark")}
+            className='form-radio text-blue-600'
+          />
+          <span>Dark</span>
+        </label>
 
-            </div>
-          </div>
-<button
-onClick={toggleThemeDialog}
-className='mt-6 w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600 transition duration-200 '>
-Close
-</button>
-        </div>
-      )}
+        {/* Light Option (Added for functionality) */}
+        <label className='flex items-center space-x-3 cursor-pointer'>
+          <input
+            type="radio"
+            name="theme"
+            value="light"
+            checked={theme === 'light'}
+            onChange={() => setTheme("light")}
+            className='form-radio text-blue-600'
+          />
+          <span>Light</span>
+        </label>
+      </div>
 
+      {/* Close Button - Now inside the modal box */}
+      <button
+        onClick={toggleThemeDialog}
+        className='mt-6 w-full bg-[#00a884] text-white py-2 rounded hover:opacity-90 transition duration-200'>
+        Ok
+      </button>
+    </div>
+  </div>
+)}
 {/* status preview */}
 {isStatusPreviewOpen &&(
   <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 '>
