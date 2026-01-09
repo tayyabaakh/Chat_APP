@@ -11,7 +11,7 @@ const messageschema=new mongoose.Schema({
         user:{type:mongoose.Schema.Types.ObjectId,ref:'User',required:true},
         emoji:{type:String}
     }],
-    messagestatus:{type:String,enum:['sent','delivered','read'],default:'sent'},
+    messageStatus:{type:String,enum:['sent','delivered','read'],default:'sent'},
 },{timestamps:true});
 const Message = mongoose.model('Message',messageschema);
 module.exports = Message;

@@ -9,7 +9,7 @@ const router=express.Router();
 // route2: verify otp
 router.post('/send-otp',authController.sendOtp);
 router.post('/verify-otp',authController.verifyotp);
-router.get('/logout',authController.logout);
+router.post('/logout',authController.logout);
 
 // protected route
 router.put('/update-profile',authMiddleware,multerMiddleware.single('profilePicture'),authController.updateProfile)
