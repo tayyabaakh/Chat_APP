@@ -1,180 +1,10 @@
-// const Conversation = require('../models/Status')
-// const response = require('../utils/responseHandler')
-// const Message = require('../models/Message');
-// const Status = require('../models/Status');
-
-// exports.createStatus = async (req, res) => {
-//     try {
-//         const { content, contentType } = req.body;
-//         const userId = req.user.userId;
-//         const file = req.file;
-
-//         let mediaUrl = null;
-//         let finalContentType = contentType || 'text';
-
-//         // handle file upload
-//         if (file) {
-//             const uploadFile = await uploadFileToCloudinary(file);
-//             if (!uploadFile?.secure_url) {
-//                 return Response(res, 400, "Failed to upload media");
-//             }
-//             mediaUrl = uploadFile?.secure_url;
-//             if (file.mimetype.startwith('image')) {
-//                 finalContentType = "image";
-//             }
-//             else if (file.mimetype.startwith("video")) {
-//                 finalContentType = "video";
-//             }
-//             else {
-//                 return response(res, 400, "Unsupported file type");
-//             }
-//         }
-//         else if (content?.trim()) {
-//             finalContentType = "text";;
-//         }
-//         else {
-//             return response(res, 400, "Message content is required");
-//         }
-
-//         const expiresAt = new Date();
-//         expiresAt.setHours(expiresAt.getHours() + 24)
-
-//         const status = new Status({
-//             user: userId,
-//             content: mediaUrl || content,
-//             contentType: finalContentType,
-//             expiresAt
-
-
-
-//         });
-//         await status.save();
-
-
-//         const populatedStatus = await Status.findOne(status?._id)
-//             .populate("user", "username profilePicture")
-//             .populate("viewers", "username profilePicture");
-
-
-//         // emit socket event
-//         if (req.io && req.socketUserMap) {
-//             // Broadcast to all connecting users except the creator
-
-//             for (const [connectedUserId, socketId] of req.socketUserMap) {
-//                 if (connectedUserId !== userId) {
-//                     req.io.tp(socketId).emit("new_status", populatedStatus)
-//                 }
-//             }
-//         }
-
-//         return response(res, 201, "Messge send successfully", populatedStatus);
-//     } catch (error) {
-//         console.log(error);
-//         return response(res, 500, "Internal server error");
-
-//     }
-// };
-
-// exports.getStatuses = async (req, res) => {
-//     try {
-//         const statuses = await Status.find({
-//             expiresAt: { $gt: new Date() },
-//         })
-//             .populate("user", "username profilePicture")
-//             .populate("viewers", "username profilePicture")
-//             .sort({ createdAt: -1 });
-
-//         return response(res, 200, "status retrived successfully")
-//     } catch (error) {
-//         console.log(error);
-//         return response(res, 500, "Internal server error");
-//     }
-// }
-// exports.viewStatus = async (req, res) => {
-//     const { statusId } = req.params;
-//     const userId = req.user.userId;
-
-//     try {
-//         const status = await Status.findById(statusId);
-//         if (!status) {
-//             return response(res, 404, "Status not found");
-//         }
-//         if (!status.viewers.push(userId)) {
-//             status.viewers.push(userId);
-//             await status.save();
-
-//             const updateStatus = await Status.findById(statusId)
-//                 .populate("user", "username profilePicture")
-//                 .populate("viewers", "username profilePicture")
-
-
-
-//             // emit socket event 
-//             if (req.io && req.socketUserMap) {
-//                 // Broadcast to all connecting users except the creator
-
-//                 const statusOwnerSocketId = req.socketUserMap.get(status.user._id.toString())
-//                 if (statusOwnerSocketId) {
-//                     const viewData = {
-//                         statusId,
-//                         viewerId: userId,
-//                         totalViewers: updateStatus.viewers.length,
-//                         viewers: updateStatus.viewers
-//                     }
-//                     res.io.to(statusOwnerSocketId).emit("status_viewed", viewData)
-//                 }
-//                 else {
-//                     console.log(('status owner not connected'));
-
-//                 }
-//             }
-//         }
-//         else {
-//             console.log('user already viewed the status');
-
-//         }
-//         return response(res, 200, 'status viewed successfully')
-//     } catch (error) {
-//         console.log(error);
-//         return response(res, 500, "Internal server error");
-//     }
-// }
-
-// exports.deleteStatus = async (req, res) => {
-//     const { statusId } = req.params;
-//     const userId = req.user.userId;
-//     try {
-//         const status = await Status.findById(statusId);
-//         if (!status) {
-//             return response(res, 404, 'Status not found');
-//         }
-//         if (status.user.toString() !== userId) {
-//             return response(res, 403, 'Not authorized to delete this status')
-//         }
-//         await status.deleteOne();
-
-
-//         // emit socket event 
-//         if (req.io && req.socketUserMap) {
-
-//             for (const [connectedUserId, socketId] of req.socketUserMap) {
-//                 if (connectedUserId !== userId) {
-//                     req.io.tp(socketId).emit("status_deleted", statusId)
-//                 }
-//             }
-//         }
-//         return response(res, 200, "Status deleted successfully")
-//     } catch (error) {
-//         console.log(error);
-//         return response(res, 500, "Internal server error");
-//     }
-// }
-
-
 const Status = require('../models/Status');
 const response = require('../utils/responseHandler');
 const { uploadFileToCloudinary } = require('../config/cloudinaryConfig');
 
+// ---------------------------------------------------------
+// 1. CREATE STATUS: Naya status lagana (Text, Image, ya Video)
+// ---------------------------------------------------------
 exports.createStatus = async (req, res) => {
     try {
         const { content, contentType } = req.body;
@@ -184,6 +14,7 @@ exports.createStatus = async (req, res) => {
         let mediaUrl = null;
         let finalContentType = contentType || 'text';
 
+        // Agar user ne file upload ki hai
         if (file) {
             const uploadFile = await uploadFileToCloudinary(file);
             if (!uploadFile?.secure_url) {
@@ -191,7 +22,7 @@ exports.createStatus = async (req, res) => {
             }
             mediaUrl = uploadFile.secure_url;
             
-            // Fixed: startsWith
+            // File type check karna (image hai ya video)
             if (file.mimetype.startsWith('image')) {
                 finalContentType = "image";
             } else if (file.mimetype.startsWith("video")) {
@@ -200,9 +31,11 @@ exports.createStatus = async (req, res) => {
                 return response(res, 400, "Unsupported file type");
             }
         } else if (!content?.trim()) {
+            // Agar na file hai na text content
             return response(res, 400, "Status content is required");
         }
 
+        // Expiry Logic: Status ko current time se 24 ghante baad expire karna
         const expiresAt = new Date();
         expiresAt.setHours(expiresAt.getHours() + 24);
 
@@ -214,15 +47,16 @@ exports.createStatus = async (req, res) => {
         });
         await status.save();
 
+        // Data populate karna taake UI par user ki info dikh sakay
         const populatedStatus = await Status.findById(status._id)
             .populate("user", "username profilePicture")
             .populate("viewers", "username profilePicture");
 
-        // Socket Emit
+        // --- REAL-TIME BROADCAST ---
+        // Saare online users ko naye status ka notification bhejna
         if (req.io && req.socketUserMap) {
             for (const [connectedUserId, socketId] of req.socketUserMap) {
                 if (connectedUserId !== userId) {
-                    // Fixed: .to() instead of .tp()
                     req.io.to(socketId).emit("new_status", populatedStatus);
                 }
             }
@@ -235,9 +69,13 @@ exports.createStatus = async (req, res) => {
     }
 };
 
+// ---------------------------------------------------------
+// 2. GET STATUSES: Sirf wahi status laana jo expire nahi huye
+// ---------------------------------------------------------
 exports.getStatuses = async (req, res) => {
     try {
         const statuses = await Status.find({
+            // Expiry time current time se bara hona chahiye ($gt: Greater Than)
             expiresAt: { $gt: new Date() },
         })
         .populate("user", "username profilePicture")
@@ -251,6 +89,9 @@ exports.getStatuses = async (req, res) => {
     }
 };
 
+// ---------------------------------------------------------
+// 3. VIEW STATUS: Status dekhna aur viewer list mein naam add karna
+// ---------------------------------------------------------
 exports.viewStatus = async (req, res) => {
     const { statusId } = req.params;
     const userId = req.user.userId;
@@ -259,7 +100,7 @@ exports.viewStatus = async (req, res) => {
         const status = await Status.findById(statusId);
         if (!status) return response(res, 404, "Status not found");
 
-        // Fixed logic: Check if user already viewed
+        // Check karna ke user ne pehlay toh nahi dekha (Duplicate views se bachna)
         if (!status.viewers.includes(userId)) {
             status.viewers.push(userId);
             await status.save();
@@ -269,6 +110,8 @@ exports.viewStatus = async (req, res) => {
             .populate("user", "username profilePicture")
             .populate("viewers", "username profilePicture");
 
+        // --- REAL-TIME NOTIFICATION TO OWNER ---
+        // Status lagane walay ko batana ke falana bande ne aapka status dekh liya
         if (req.io && req.socketUserMap) {
             const statusOwnerSocketId = req.socketUserMap.get(status.user.toString());
             if (statusOwnerSocketId) {
@@ -278,7 +121,6 @@ exports.viewStatus = async (req, res) => {
                     totalViewers: updateStatus.viewers.length,
                     viewers: updateStatus.viewers
                 };
-                // Fixed: req.io instead of res.io, and .to() instead of .tp()
                 req.io.to(statusOwnerSocketId).emit("status_viewed", viewData);
             }
         }
@@ -289,6 +131,9 @@ exports.viewStatus = async (req, res) => {
     }
 };
 
+// ---------------------------------------------------------
+// 4. DELETE STATUS: Status ko khatam karna
+// ---------------------------------------------------------
 exports.deleteStatus = async (req, res) => {
     const { statusId } = req.params;
     const userId = req.user.userId;
@@ -296,15 +141,16 @@ exports.deleteStatus = async (req, res) => {
         const status = await Status.findById(statusId);
         if (!status) return response(res, 404, 'Status not found');
 
+        // Security check: Sirf status ka owner hi delete kar sakay
         if (status.user.toString() !== userId) {
             return response(res, 403, 'Not authorized');
         }
 
         await status.deleteOne();
 
+        // Real-time notification: Sab ke screen se status remove karna
         if (req.io && req.socketUserMap) {
             for (const [connectedUserId, socketId] of req.socketUserMap) {
-                // Fixed: .to() instead of .tp()
                 req.io.to(socketId).emit("status_deleted", statusId);
             }
         }

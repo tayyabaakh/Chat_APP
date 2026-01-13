@@ -1,22 +1,3 @@
-// import React, { useState } from 'react'
-// import useLayoutStore from '../../store/layoutStore';
-// import userThemeStore from '../../store/ThemeStore';
-// import useUserStore from '../../store/useUserStore';
-
-// const ChatList = ({contacts}) => {
-//   const setSelectedContact = useLayoutStore(state => state.setSelectedContact);
-//   const selectedContact = useLayoutStore(state => state.selectedContact);
-//   const { theme, setTheme } = userThemeStore();
-//   const {user} =useUserStore();
-//   const [search,setSearch] =useState("");
-//   const filteredContacts= contacts?.filter((contact)=>contact?.usename?.toLowerCase().includes (search.toLowerCase()))
-
-//   return (
-//     <div>Chat</div>
-//   )
-// }
-
-// export default ChatList
 
 
 import React, { useState } from 'react'
@@ -107,7 +88,7 @@ const ChatList = ({ contacts }) => {
                   {/* Display time from last message if it exists */}
                   <span className="text-xs text-gray-500">
                     {contact?.conversation?.lastMessage ?
-                      new Date(contact.conversation.lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                      new Date(contact.conversation.lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' ,hour12: true})
                       : ""}
                   </span>
                 </div>
@@ -119,10 +100,10 @@ const ChatList = ({ contacts }) => {
                   </p>
 
                   {/* --- CONVERSATION COUNT BADGE --- */}
-                  {contact?.conversation && (
+                  {contact?.conversation?.unreadCounts > 0 && (
                     <div className="bg-[#00a884] text-white text-[10px] font-bold min-w-[20px] h-5 flex items-center justify-center rounded-full px-1">
                       {/* If you have an unreadCount field, use it here. For now, showing '1' as placeholder */}
-                      {contact?.conversation?.unreadCount || 1}
+                      {contact?.conversation?.unreadCounts }
                     </div>
                   )}
                 </div>

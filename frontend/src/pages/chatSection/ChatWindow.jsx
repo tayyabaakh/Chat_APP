@@ -10,6 +10,7 @@ import EmojiPicker from 'emoji-picker-react';
 import userThemeStore from '../../store/ThemeStore';
 import useUserStore from '../../store/useUserStore';
 import { useChatStore } from '../../store/ChatStore';
+import { getSocket } from '../../services/chat_services'; 
 
 // Components
 import MessageBubble from './MessageBubble';
@@ -34,19 +35,19 @@ const ChatWindow = ({ selectedContact, setSelectedContact, isMobile }) => {
     const { 
         messages, fetchMessage, fetchConversation, conversations, 
         sendMessage, startTyping, stopTyping, isUserTyping, 
-        getUserLastSeen, isUserOnline ,addReaction, deleteMessage
+        getUserLastSeen, isUserOnline, addReaction, deleteMessage
     } = useChatStore();
 
     const online = isUserOnline(selectedContact?._id);
     const lastSeen = getUserLastSeen(selectedContact?._id);
     const isTyping = isUserTyping(selectedContact?._id);
 
-    // Initial Data Fetch
+    // 1. Initial Load for Sidebar
     useEffect(() => {
         fetchConversation();
     }, [fetchConversation]);
 
-    // Fetch messages when contact changes
+    // 2. Fetch History when contact changes
     useEffect(() => {
         if (selectedContact?._id && conversations?.data?.length > 0) {
             const conversation = conversations.data.find((conv) =>
@@ -58,7 +59,47 @@ const ChatWindow = ({ selectedContact, setSelectedContact, isMobile }) => {
         }
     }, [selectedContact, conversations, fetchMessage]);
 
-    // Auto Scroll to Bottom
+    // 3. THE RELOAD FIX: Socket Listeners
+    useEffect(() => {
+        const socket = getSocket();
+        if (!socket) return;
+
+        const handleReceiveMessage = (newMessage) => {
+            // Check if message belongs to THIS open chat window
+            const isRelatedToCurrentChat = 
+                newMessage.sender._id === selectedContact?._id || 
+                newMessage.receiver._id === selectedContact?._id ||
+                newMessage.sender === selectedContact?._id;
+
+            if (isRelatedToCurrentChat) {
+                // Prevent duplicate messages if the sender already added it to UI
+                useChatStore.setState((state) => {
+                    const messageExists = state.messages.find(m => m._id === newMessage._id);
+                    if (messageExists) return state;
+                    return { messages: [...state.messages, newMessage] };
+                });
+            }
+            
+            // Optional: Refresh sidebar to show latest message preview
+            fetchConversation();
+        };
+
+        const handleDeletedMessage = (deletedId) => {
+            useChatStore.setState((state) => ({
+                messages: state.messages.filter(m => m._id !== deletedId)
+            }));
+        };
+
+        socket.on("receive_message", handleReceiveMessage);
+        socket.on("message_deleted", handleDeletedMessage);
+
+        return () => {
+            socket.off("receive_message", handleReceiveMessage);
+            socket.off("message_deleted", handleDeletedMessage);
+        };
+    }, [selectedContact, fetchConversation]);
+
+    // 4. Auto Scroll
     const scrollToBottom = () => {
         messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
@@ -67,9 +108,9 @@ const ChatWindow = ({ selectedContact, setSelectedContact, isMobile }) => {
         scrollToBottom();
     }, [messages, isTyping]);
 
-    // Typing Logic
+    // 5. Typing Indicator Logic
     useEffect(() => {
-        if (message && selectedContact) {
+        if (message.trim() && selectedContact) {
             startTyping(selectedContact._id);
             if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
             typingTimeoutRef.current = setTimeout(() => {
@@ -77,7 +118,7 @@ const ChatWindow = ({ selectedContact, setSelectedContact, isMobile }) => {
             }, 2000);
         }
         return () => { if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current); };
-    }, [message, selectedContact, startTyping, stopTyping]);
+    }, [message, selectedContact]);
 
     const handleFileChange = (e) => {
         const file = e.target.files[0];
@@ -101,31 +142,43 @@ const ChatWindow = ({ selectedContact, setSelectedContact, isMobile }) => {
             formData.append("receiverId", selectedContact?._id);
             formData.append("messageStatus", online ? "delivered" : "sent");
 
+            let contentType = "text";
+            if (selectedFile) {
+                if (selectedFile.type.startsWith('image/')) contentType = "image";
+                else if (selectedFile.type.startsWith('video/')) contentType = "video";
+                else contentType = "document"; 
+            }
+            formData.append("contentType", contentType); 
+
             if (message.trim()) formData.append("content", message.trim());
             if (selectedFile) formData.append("media", selectedFile);
 
-            await sendMessage(formData);
-
+            // Clear UI immediately for smooth UX
+            const currentMessage = message;
             setMessage("");
             setfilePreview(null);
             setSelectedFile(null);
             setshowEmoji(false);
+            
+            const response = await sendMessage(formData);
+
+            // If your sendMessage doesn't automatically update the store, 
+            // you can manually push the response here:
+            // useChatStore.setState((state) => ({ messages: [...state.messages, response.data] }));
+
         } catch (error) {
             console.error("Failed to send message", error);
         }
     };
 
+    // --- RENDER HELPERS ---
     const renderDateSeperator = (dateString) => {
         const d = new Date(dateString);
         if (!isValidate(d)) return null;
-        
-        let label;
-        if (isToday(d)) label = "Today";
-        else if (isYesterday(d)) label = "Yesterday";
-        else label = format(d, "EEEE, MMMM d");
+        let label = isToday(d) ? "Today" : isYesterday(d) ? "Yesterday" : format(d, "EEEE, MMMM d");
 
         return (
-            <div className='flex justify-center my-6 sticky top-0 z-10'>
+            <div className='flex justify-center my-6 sticky top-2 z-10' key={dateString}>
                 <span className={`px-4 py-1 rounded-md text-[11px] font-medium shadow-sm uppercase ${
                     theme === 'dark' ? "bg-[#182229] text-[#8696a0]" : "bg-white text-gray-500"
                 }`}>
@@ -157,10 +210,9 @@ const ChatWindow = ({ selectedContact, setSelectedContact, isMobile }) => {
     }
 
     return (
-        <div className={`flex flex-col h-full relative overflow-hidden ${theme === 'dark' ? 'bg-[#0b141a]' : 'bg-[#efeae2]'}`}>
-            
+        <div className={`flex flex-col h-screen max-h-screen relative overflow-hidden ${theme === 'dark' ? 'bg-[#0b141a]' : 'bg-[#efeae2]'}`}>
             {/* Header */}
-            <header className={`flex items-center justify-between p-3 z-20 ${theme === 'dark' ? 'bg-[#202c33]' : 'bg-[#f0f2f5]'}`}>
+            <header className={`shrink-0 flex items-center justify-between p-3 z-20 shadow-sm ${theme === 'dark' ? 'bg-[#202c33]' : 'bg-[#f0f2f5]'}`}>
                 <div className="flex items-center gap-3">
                     {isMobile && <ArrowLeft className="cursor-pointer" onClick={() => setSelectedContact(null)} />}
                     <div className="relative">
@@ -193,21 +245,13 @@ const ChatWindow = ({ selectedContact, setSelectedContact, isMobile }) => {
                                 key={msg._id} 
                                 message={msg} 
                                 theme={theme}
-                                isOwn={String(msg.sender._id) === String(user?._id)}
-                                onReact={(msgId, emoji) =>addReaction(msgId, emoji)}
+                                isOwn={String(msg.sender._id || msg.sender) === String(user?._id)}
+                                onReact={(msgId, emoji) => addReaction(msgId, emoji)}
                                 deleteMessage={(msgId) => deleteMessage(msgId)}
                             />
                         ))}
                     </React.Fragment>
                 ))}
-                
-                {isTyping && (
-                    <div className="flex justify-start mb-4">
-                        <div className={`px-4 py-2 rounded-lg text-xs ${theme === 'dark' ? 'bg-[#202c33] text-gray-300' : 'bg-white text-gray-500'}`}>
-                            {selectedContact.username} is typing...
-                        </div>
-                    </div>
-                )}
                 <div ref={messageEndRef} />
             </div>
 
@@ -230,27 +274,20 @@ const ChatWindow = ({ selectedContact, setSelectedContact, isMobile }) => {
             )}
 
             {/* Footer */}
-            <footer className={`p-2 flex items-center gap-2 z-20 ${theme === 'dark' ? 'bg-[#202c33]' : 'bg-[#f0f2f5]'}`}>
+            <footer className={`shrink-0 p-2 pb-4 flex items-center gap-2 z-20 ${theme === 'dark' ? 'bg-[#202c33]' : 'bg-[#f0f2f5]'}`}>
                 <div className="flex items-center gap-2">
                     <div className="relative">
-                        <Paperclip 
-                            className={`cursor-pointer hover:scale-110 transition-transform ${showFileMenu ? 'text-[#00a884]' : 'text-gray-400'}`} 
-                            onClick={() => setshowFileMenu(!showFileMenu)} 
-                        />
+                        <Paperclip className="cursor-pointer text-gray-400 hover:text-[#00a884]" onClick={() => setshowFileMenu(!showFileMenu)} />
                         {showFileMenu && (
-                            <div className={`absolute bottom-12 left-0 p-3 rounded-xl flex flex-col gap-4 shadow-2xl animate-in fade-in slide-in-from-bottom-2 ${theme === 'dark' ? 'bg-[#233138]' : 'bg-white'}`}>
-                                <label className="cursor-pointer hover:text-blue-500"><Image size={20}/><input type="file" hidden accept="image/*" onChange={handleFileChange} /></label>
-                                <label className="cursor-pointer hover:text-purple-500"><Video size={20}/><input type="file" hidden accept="video/*" onChange={handleFileChange} /></label>
+                            <div className={`absolute bottom-12 left-0 p-3 rounded-xl flex flex-col gap-4 shadow-2xl ${theme === 'dark' ? 'bg-[#233138]' : 'bg-white'}`}>
+                                <label className="cursor-pointer hover:text-blue-500"><Image size={20}/><input type="file" hidden accept="image/*,video/*" onChange={handleFileChange} /></label>
                                 <label className="cursor-pointer hover:text-orange-500"><FileText size={20}/><input type="file" hidden onChange={handleFileChange} /></label>
                             </div>
                         )}
                     </div>
-                    <Smile 
-                        className={`cursor-pointer hover:scale-110 transition-transform ${showEmoji ? 'text-[#00a884]' : 'text-gray-400'}`} 
-                        onClick={() => setshowEmoji(!showEmoji)} 
-                    />
+                    <Smile className="cursor-pointer text-gray-400 hover:text-[#00a884]" onClick={() => setshowEmoji(!showEmoji)} />
                     {showEmoji && (
-                        <div className="absolute bottom-16 left-2 z-50 shadow-2xl" ref={emojiPickerRef}>
+                        <div className="absolute bottom-16 left-2 z-50" ref={emojiPickerRef}>
                             <EmojiPicker theme={theme === 'dark' ? 'dark' : 'light'} onEmojiClick={(emoji) => setMessage(prev => prev + emoji.emoji)} />
                         </div>
                     )}
@@ -262,15 +299,13 @@ const ChatWindow = ({ selectedContact, setSelectedContact, isMobile }) => {
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                    className={`flex-1 p-2.5 px-4 rounded-lg outline-none text-sm ${
-                        theme === 'dark' ? 'bg-[#2a3942] text-white' : 'bg-white text-black'
-                    }`}
+                    className={`flex-1 p-2.5 px-4 rounded-lg outline-none text-sm ${theme === 'dark' ? 'bg-[#2a3942] text-white' : 'bg-white text-black'}`}
                 />
 
                 <button 
                     onClick={handleSendMessage}
                     disabled={!message.trim() && !selectedFile}
-                    className="p-2.5 bg-[#00a884] rounded-full text-white hover:bg-[#06cf9c] disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
+                    className="p-2.5 bg-[#00a884] rounded-full text-white hover:bg-[#06cf9c] disabled:opacity-50"
                 >
                     <Send size={20} />
                 </button>

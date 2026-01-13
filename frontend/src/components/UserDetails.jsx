@@ -36,36 +36,78 @@ const UserDetails = () => {
     }
   };
 
-  const handleSave = async (field) => {
-    try {
-      // FIX: Initialize FormData
-      const formData = new FormData();
+  // const handleSave = async (field) => {
+  //   try {
+  //     // FIX: Initialize FormData
+  //     const formData = new FormData();
 
-      if (field === 'name') {
-        formData.append("username", name);
-        setIsEditingName(false);
-        setshowNameEmoji(false);
-      } else if (field === 'about') {
-        formData.append("about", about);
-        setisEdtingAbout(false);
-        setshowAboutEmoji(false);
-      }
+  //     if (field === 'name') {
+  //       formData.append("username", name);
+  //       setIsEditingName(false);
+  //       setshowNameEmoji(false);
+  //     } else if (field === 'about') {
+  //       formData.append("about", about);
+  //       setisEdtingAbout(false);
+  //       setshowAboutEmoji(false);
+  //     }
       
-      if (profilePic && field === "profile") {
-        formData.append("profilePicture", profilePic); // Adjusted key to match profile usage
-      }
+  //     if (profilePic && field === "profile") {
+  //       formData.append("media", profilePic); // Adjusted key to match profile usage
+  //     }
 
-      const updated = await updateUserProfile(formData);
-      setUser(updated?.data);
-      setProfilePic(null);
-      setPreview(null);
-      toast.success("Profile Updated");
-    } catch (error) {
-      console.error(error);
-      toast.error("Failed to update profile");
+  //     const updated = await updateUserProfile(formData);
+  //     setUser(updated?.data);
+  //     setProfilePic(null);
+  //     setPreview(null);
+  //     toast.success("Profile Updated");
+  //   } catch (error) {
+  //     console.error(error);
+  //     toast.error("Failed to update profile");
+  //   }
+  // };
+
+
+  const handleSave = async (field) => {
+  try {
+    const formData = new FormData();
+
+    // Logic for updating Name
+    if (field === 'name') {
+      if (!name.trim()) return toast.error("Name cannot be empty");
+      formData.append("username", name);
+    } 
+    // Logic for updating About
+    else if (field === 'about') {
+      formData.append("about", about);
+    } 
+    // Logic for updating Profile Picture
+    else if (field === "profile") {
+      if (!profilePic) return toast.error("Please select an image");
+      // Key 'media' matches your authRoute.js multerMiddleware.single('media')
+      formData.append("media", profilePic); 
     }
-  };
 
+    const response = await updateUserProfile(formData);
+    
+    // Sync User Store: Extract user correctly from your response handler
+    const updatedUser = response.data?.user || response.data;
+    setUser(updatedUser);
+
+    // Reset UI states
+    setProfilePic(null);
+    setPreview(null);
+    setIsEditingName(false);
+    setisEdtingAbout(false);
+    setshowNameEmoji(false);
+    setshowAboutEmoji(false);
+    
+    toast.success("Profile Updated");
+  } catch (error) {
+    // Log actual server error to console
+    console.error("Server Error:", error.response?.data);
+    toast.error(error.response?.data?.message || "Failed to update profile");
+  }
+};
   const handleEmojiSelect = (emoji, field) => {
     if (field === 'name') {
       setName((prev) => prev + emoji.emoji);

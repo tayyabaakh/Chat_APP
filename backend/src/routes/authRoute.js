@@ -12,7 +12,7 @@ router.post('/verify-otp',authController.verifyotp);
 router.post('/logout',authController.logout);
 
 // protected route
-router.put('/update-profile',authMiddleware,multerMiddleware.single('profilePicture'),authController.updateProfile)
+router.put('/update-profile',authMiddleware,multerMiddleware.single('media'),authController.updateProfile)
 router.get('/check-auth',authMiddleware,authController.checkAuthenticated);
 router.get('/users',authMiddleware,authController.getAllUsers);
 
